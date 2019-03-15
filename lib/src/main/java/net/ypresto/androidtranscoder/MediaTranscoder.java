@@ -159,9 +159,7 @@ public class MediaTranscoder {
      * @param listener          Listener instance for callback.
      */
     public Future<Void> transcodeVideo(final FileDescriptor inFileDescriptor, final String outPath, final MediaFormatStrategy outFormatStrategy, final Listener listener) {
-        Looper looper = Looper.myLooper();
-        if (looper == null) looper = Looper.getMainLooper();
-        final Handler handler = new Handler(looper);
+
         final AtomicReference<Future<Void>> futureReference = new AtomicReference<>();
         final Future<Void> createdFuture = mExecutor.submit(new Callable<Void>() {
             @Override
@@ -172,12 +170,7 @@ public class MediaTranscoder {
                     engine.setProgressCallback(new MediaTranscoderEngine.ProgressCallback() {
                         @Override
                         public void onProgress(final double progress) {
-                            handler.post(new Runnable() { // TODO: reuse instance
-                                @Override
-                                public void run() {
-                                    listener.onTranscodeProgress(progress);
-                                }
-                            });
+                            listener.onTranscodeProgress(progress);
                         }
                     });
                     engine.setDataSource(inFileDescriptor);
@@ -195,21 +188,19 @@ public class MediaTranscoder {
                 }
 
                 final Exception exception = caughtException;
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (exception == null) {
-                            listener.onTranscodeCompleted();
-                        } else {
-                            Future<Void> future = futureReference.get();
-                            if (future != null && future.isCancelled()) {
-                                listener.onTranscodeCanceled();
-                            } else {
-                                listener.onTranscodeFailed(exception);
-                            }
-                        }
+
+                if (exception == null) {
+                    listener.onTranscodeCompleted();
+                } else {
+                    Future<Void> future = futureReference.get();
+                    if (future != null && future.isCancelled()) {
+                        listener.onTranscodeCanceled();
+                    } else {
+                        listener.onTranscodeFailed(exception);
                     }
-                });
+                }
+
+
 
                 if (exception != null) throw exception;
                 return null;
